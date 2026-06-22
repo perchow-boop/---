@@ -1,0 +1,25 @@
+{
+  "name": "lukibou-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "setup:orders": "node scripts/setup-orders.js",
+    "migrate:payment-no": "node scripts/migrate-payment-no.js",
+    "migrate:users-address": "node scripts/migrate-users-address.js",
+    "migrate:users-country-city": "node scripts/migrate-users-country-city.js",
+    "migrate:member-v2": "node scripts/migrate-member-v2.js",
+    "migrate:member-id": "node scripts/migrate-member-id.js",
+    "setup:admin-auth": "node scripts/setup-admin-auth.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.2"
+  }
+}
