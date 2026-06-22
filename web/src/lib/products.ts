@@ -1,4 +1,7 @@
-import { fetchProduct, fetchProducts } from "@/lib/products-api";
+import {
+  getProductById as getDbProductById,
+  listProducts,
+} from "@/lib/server/products";
 import type { DbProduct } from "@/types/db-product";
 import type { Product } from "@/types/product";
 
@@ -65,8 +68,8 @@ export function mapDbProductToProduct(db: DbProduct): Product {
 }
 
 export async function getProductsFromDb(): Promise<Product[]> {
-  const data = await fetchProducts();
-  return data.products.map(mapDbProductToProduct);
+  const products = await listProducts();
+  return products.map(mapDbProductToProduct);
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
@@ -76,8 +79,9 @@ export async function getProductById(id: string): Promise<Product | undefined> {
   }
 
   try {
-    const data = await fetchProduct(productId);
-    return mapDbProductToProduct(data.product);
+    const product = await getDbProductById(productId);
+    if (!product) return undefined;
+    return mapDbProductToProduct(product);
   } catch {
     return undefined;
   }

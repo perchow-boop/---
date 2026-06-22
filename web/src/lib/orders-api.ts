@@ -1,6 +1,5 @@
 import type { OrderDetail, OrderSummary } from "@/types/order";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { INTERNAL_API } from "@/lib/api-client";
 
 async function request<T>(
   path: string,
@@ -10,7 +9,8 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
+      cache: "no-store",
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -19,9 +19,7 @@ async function request<T>(
       },
     });
   } catch {
-    throw new Error(
-      `無法連線至訂單 API（${API_URL}）。請確認已啟動後端：在 server 資料夾執行 npm run dev`,
-    );
+    throw new Error("無法連線至訂單 API，請確認 Next.js 開發伺服器是否正常運作");
   }
 
   let data: { error?: string };
@@ -39,12 +37,15 @@ async function request<T>(
 }
 
 export async function fetchOrders(token: string) {
-  const data = await request<{ orders: OrderSummary[] }>("/orders", token);
+  const data = await request<{ orders: OrderSummary[] }>(
+    INTERNAL_API.orders,
+    token,
+  );
   return data.orders;
 }
 
 export async function fetchOrderDetail(token: string, orderId: number) {
-  return request<OrderDetail>(`/orders/${orderId}`, token);
+  return request<OrderDetail>(`${INTERNAL_API.orders}/${orderId}`, token);
 }
 
 export async function confirmOrder(sessionId: string) {

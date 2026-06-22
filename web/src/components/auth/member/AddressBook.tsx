@@ -114,7 +114,11 @@ export function AddressBook({ user, token, onUpdated }: AddressBookProps) {
       const data =
         editingId === "new"
           ? await createAddress(token, payload)
-          : await updateAddress(token, editingId, payload);
+          : typeof editingId === "number"
+            ? await updateAddress(token, editingId, payload)
+            : null;
+
+      if (!data) return;
 
       setMessage(data.message);
       setEditingId(null);

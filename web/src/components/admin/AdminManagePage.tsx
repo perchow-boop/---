@@ -25,11 +25,6 @@ function toFormData(admin: Admin): AdminFormData {
   };
 }
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString("zh-Hant-HK");
-}
-
 export function AdminManagePage() {
   const router = useRouter();
   const { admin, token, loading: authLoading, logout } = useAdminAuth();
@@ -113,8 +108,8 @@ export function AdminManagePage() {
         const data = await registerAdmin(
           {
             username: form.username.trim(),
-            password: form.password,
             email: form.email.trim() || undefined,
+            password: form.password,
             role: form.role,
           },
           token,
@@ -211,6 +206,7 @@ export function AdminManagePage() {
           <div>
             <label className="mb-1 block text-sm font-medium">帳號 *</label>
             <input
+              type="text"
               required
               minLength={3}
               maxLength={50}
@@ -218,10 +214,27 @@ export function AdminManagePage() {
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               className="w-full rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none focus:border-accent disabled:bg-bg disabled:text-muted"
-              placeholder="admin"
+              placeholder="staff01"
             />
           </div>
           <div>
+            <label className="mb-1 block text-sm font-medium">角色 *</label>
+            <select
+              value={form.role}
+              onChange={(e) =>
+                setForm({ ...form, role: e.target.value as Admin["role"] })
+              }
+              disabled={editingId === admin?.admin_id}
+              className="w-full rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none focus:border-accent disabled:bg-bg disabled:text-muted"
+            >
+              {ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-medium">電郵</label>
             <input
               type="email"
@@ -231,7 +244,7 @@ export function AdminManagePage() {
               placeholder="admin@lukibou.com"
             />
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-medium">
               密碼 {editingId ? "（留空則不變更）" : "*"}
             </label>
@@ -244,23 +257,6 @@ export function AdminManagePage() {
               className="w-full rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none focus:border-accent"
               placeholder={editingId ? "不變更請留空" : "至少 8 個字元"}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">角色 *</label>
-            <select
-              required
-              value={form.role}
-              onChange={(e) =>
-                setForm({ ...form, role: e.target.value as Admin["role"] })
-              }
-              className="w-full rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none focus:border-accent"
-            >
-              {ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
           </div>
           {error && (
             <p className="md:col-span-2 text-sm text-red-700" role="alert">
@@ -310,7 +306,6 @@ export function AdminManagePage() {
                   <th className="px-4 py-3 font-medium">帳號</th>
                   <th className="px-4 py-3 font-medium">電郵</th>
                   <th className="px-4 py-3 font-medium">角色</th>
-                  <th className="px-4 py-3 font-medium">最後登入</th>
                   <th className="px-4 py-3 font-medium">操作</th>
                 </tr>
               </thead>
@@ -327,11 +322,8 @@ export function AdminManagePage() {
                         <span className="ml-2 text-xs text-muted">（你）</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted">{item.email || "—"}</td>
+                    <td className="px-4 py-3">{item.email || "—"}</td>
                     <td className="px-4 py-3">{item.role}</td>
-                    <td className="px-4 py-3 text-muted">
-                      {formatDateTime(item.last_login)}
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button

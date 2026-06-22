@@ -1,6 +1,5 @@
 import type { DbProduct } from "@/types/db-product";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { INTERNAL_API } from "@/lib/api-client";
 
 async function request<T>(
   path: string,
@@ -9,7 +8,7 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
       cache: "no-store",
       ...options,
       headers: {
@@ -18,9 +17,7 @@ async function request<T>(
       },
     });
   } catch {
-    throw new Error(
-      `無法連線至 API（${API_URL}）。請確認 server 已執行 npm run dev`,
-    );
+    throw new Error("無法連線至商品 API，請確認 Next.js 開發伺服器是否正常運作");
   }
 
   let data: { error?: string };
@@ -38,18 +35,21 @@ async function request<T>(
 }
 
 export async function fetchProducts() {
-  return request<{ products: DbProduct[] }>("/products");
+  return request<{ products: DbProduct[] }>(INTERNAL_API.products);
 }
 
 export async function fetchProduct(id: number, options: RequestInit = {}) {
-  return request<{ product: DbProduct }>(`/products/${id}`, options);
+  return request<{ product: DbProduct }>(
+    `${INTERNAL_API.products}/${id}`,
+    options,
+  );
 }
 
 export async function createProduct(
   token: string,
   payload: Omit<DbProduct, "product_id" | "created_at" | "updated_at">,
 ) {
-  return request<{ message: string; product: DbProduct }>("/products", {
+  return request<{ message: string; product: DbProduct }>(INTERNAL_API.products, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -61,15 +61,18 @@ export async function updateProduct(
   id: number,
   payload: Omit<DbProduct, "product_id" | "created_at" | "updated_at">,
 ) {
-  return request<{ message: string; product: DbProduct }>(`/products/${id}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
+  return request<{ message: string; product: DbProduct }>(
+    `${INTERNAL_API.products}/${id}`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function deleteProduct(token: string, id: number) {
-  return request<{ message: string }>(`/products/${id}`, {
+  return request<{ message: string }>(`${INTERNAL_API.products}/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

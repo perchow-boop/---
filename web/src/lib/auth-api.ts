@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { INTERNAL_API } from "@/lib/api-client";
 
 export type UserAddress = {
   address_id: number;
@@ -42,7 +42,7 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -50,16 +50,14 @@ async function request<T>(
       },
     });
   } catch {
-    throw new Error(
-      `無法連線至會員 API（${API_URL}）。請確認已啟動後端：在 server 資料夾執行 npm run dev`,
-    );
+    throw new Error("無法連線至會員 API，請確認 Next.js 開發伺服器是否正常運作");
   }
 
   let data: { error?: string };
   try {
     data = await response.json();
   } catch {
-    throw new Error("伺服器回應格式錯誤，請確認後端 API 是否正常運作");
+    throw new Error("伺服器回應格式錯誤");
   }
 
   if (!response.ok) {
@@ -79,7 +77,7 @@ export async function registerUser(payload: {
   password: string;
   phone?: string;
 }) {
-  return request<RegisterResponse>("/register", {
+  return request<RegisterResponse>(`${INTERNAL_API.auth}/register`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -89,14 +87,14 @@ export async function loginUser(payload: {
   email: string;
   password: string;
 }) {
-  return request<LoginResponse>("/login", {
+  return request<LoginResponse>(`${INTERNAL_API.auth}/login`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function fetchProfile(token: string) {
-  return request<{ user: User }>("/profile", {
+  return request<{ user: User }>(`${INTERNAL_API.auth}/profile`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -114,18 +112,21 @@ export async function updateProfile(
     recipient_name?: string;
   },
 ) {
-  return request<{ message: string; user: User }>("/profile", {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
+  return request<{ message: string; user: User }>(
+    `${INTERNAL_API.auth}/profile`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function changePassword(
   token: string,
   payload: { current_password: string; new_password: string },
 ) {
-  return request<{ message: string }>("/profile/password", {
+  return request<{ message: string }>(`${INTERNAL_API.auth}/profile/password`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -144,7 +145,7 @@ export type AddressPayload = {
 
 export async function createAddress(token: string, payload: AddressPayload) {
   return request<{ message: string; address: UserAddress; user: User }>(
-    "/addresses",
+    INTERNAL_API.addresses,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
@@ -159,7 +160,7 @@ export async function updateAddress(
   payload: AddressPayload,
 ) {
   return request<{ message: string; address: UserAddress; user: User }>(
-    `/addresses/${addressId}`,
+    `${INTERNAL_API.addresses}/${addressId}`,
     {
       method: "PUT",
       headers: { Authorization: `Bearer ${token}` },
@@ -169,15 +170,18 @@ export async function updateAddress(
 }
 
 export async function deleteAddress(token: string, addressId: number) {
-  return request<{ message: string; user: User }>(`/addresses/${addressId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return request<{ message: string; user: User }>(
+    `${INTERNAL_API.addresses}/${addressId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export async function setDefaultAddress(token: string, addressId: number) {
   return request<{ message: string; address: UserAddress; user: User }>(
-    `/addresses/${addressId}/default`,
+    `${INTERNAL_API.addresses}/${addressId}/default`,
     {
       method: "PUT",
       headers: { Authorization: `Bearer ${token}` },
@@ -202,20 +206,20 @@ export type FavoriteItem = {
 };
 
 export async function logoutUser(token: string) {
-  return request<{ message: string }>("/logout", {
+  return request<{ message: string }>(`${INTERNAL_API.auth}/logout`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchFavorites(token: string) {
-  return request<{ favorites: FavoriteItem[] }>("/favorites", {
+  return request<{ favorites: FavoriteItem[] }>(INTERNAL_API.favorites, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function addFavorite(token: string, productId: number) {
-  return request<{ message: string }>("/favorites", {
+  return request<{ message: string }>(INTERNAL_API.favorites, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ product_id: productId }),
@@ -223,8 +227,11 @@ export async function addFavorite(token: string, productId: number) {
 }
 
 export async function removeFavorite(token: string, productId: number) {
-  return request<{ message: string }>(`/favorites/${productId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return request<{ message: string }>(
+    `${INTERNAL_API.favorites}/${productId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }

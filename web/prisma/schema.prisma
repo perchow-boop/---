@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserStatus {
+  active
+  suspended
+}
+
+enum AdminRole {
+  superadmin
+  manager
+  staff
+}
+
+enum OrderStatus {
+  pending
+  paid
+  shipped
+  completed
+  cancelled
+  refunded
+}
+
+/// 會員（對應 lukibou_db.users）
+model User {
+  id           Int        @id @default(autoincrement()) @map("user_id")
+  memberId     String     @unique @map("member_id") @db.VarChar(20)
+  firstName    String?    @map("first_name") @db.VarChar(50)
+  lastName     String?    @map("last_name") @db.VarChar(50)
+  name         String     @db.VarChar(100)
+  email        String     @unique @db.VarChar(100)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  status       UserStatus @default(active)
+  phone        String?    @db.VarChar(20)
+  country      String     @default("") @db.VarChar(2)
+  city         String?    @db.VarChar(50)
+  address1     String     @default("") @map("address_1") @db.VarChar(255)
+  address2     String?    @map("address_2") @db.VarChar(255)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  auth      Auth[]
+  addresses UserAddress[]
+  favorites Favorite[]
+  orders    Order[]
+
+  @@map("users")
+}
+
+/// 會員登入 session（對應 lukibou_db.auth）
+model Auth {
+  id        Int       @id @default(autoincrement()) @map("auth_id")
+  userId    Int       @map("user_id")
+  token     String    @db.VarChar(512)
+  expiresAt DateTime  @map("expires_at")
+  lastLogin DateTime? @map("last_login")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth")
+}
+
+/// 管理員（對應 lukibou_db.admins）
+model Admin {
+  id           Int       @id @default(autoincrement()) @map("admin_id")
+  username     String    @unique @db.VarChar(50)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  email        String?   @unique @db.VarChar(100)
+  role         AdminRole @default(staff)
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  auth AdminAuth[]
+
+  @@map("admins")
+}
+
+/// 管理員登入 session（對應 lukibou_db.adminauth）
+model AdminAuth {
+  id        Int       @id @default(autoincrement()) @map("auth_id")
+  adminId   Int       @map("admin_id")
+  token     String    @db.Text
+  expiresAt DateTime  @map("expires_at")
+  lastLogin DateTime? @default(now()) @map("last_login")
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+  @@map("adminauth")
+}
+
+model UserAddress {
+  id            Int      @id @default(autoincrement()) @map("address_id")
+  userId        Int      @map("user_id")
+  recipientName String?  @map("recipient_name") @db.VarChar(100)
+  phone         String?  @db.VarChar(20)
+  country       String?  @db.VarChar(50)
+  city          String?  @db.VarChar(50)
+  streetAddress String?  @map("street_address") @db.VarChar(255)
+  postalCode    String?  @map("postal_code") @db.VarChar(20)
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shippingOrders Order[]
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@map("user_addresses")
+}
+
+/// 商品（對應 lukibou_db.products）
+model Product {
+  id          Int      @id @default(autoincrement()) @map("product_id")
+  typeId      String   @map("type_id") @db.VarChar(20)
+  category    String   @map("type") @db.VarChar(20)
+  name        String   @db.VarChar(150)
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  imageUrl    String?  @map("image_url") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  favorites  Favorite[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement()) @map("favorite_id")
+  userId    Int      @map("user_id")
+  productId Int      @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorites")
+}
+
+/// 訂單（對應 lukibou_db.orders）
+model Order {
+  id                  Int         @id @default(autoincrement()) @map("order_id")
+  userId              Int?        @map("user_id")
+  guestName           String?     @map("guest_name") @db.VarChar(100)
+  guestEmail          String?     @map("guest_email") @db.VarChar(100)
+  guestPhone          String?     @map("guest_phone") @db.VarChar(20)
+  shippingAddressId   Int?        @map("shipping_address_id")
+  shippingAddressText String?     @map("shipping_address_text") @db.Text
+  stripePaymentId     String      @unique @map("stripe_payment_id") @db.VarChar(255)
+  shippingAddress     String      @default("") @map("shipping_address") @db.VarChar(255)
+  billingAddress      String      @default("") @map("billing_address") @db.VarChar(255)
+  totalAmount         Decimal?    @map("total_amount") @db.Decimal(10, 2)
+  paymentNo           String      @unique @map("payment_no") @db.VarChar(20)
+  status              OrderStatus @default(pending)
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  user            User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shippingAddressRef UserAddress? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  items           OrderItem[]
+
+  @@index([userId])
+  @@index([paymentNo])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement()) @map("item_id")
+  orderId   Int     @map("order_id")
+  productId Int     @map("product_id")
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}

@@ -13,14 +13,16 @@ import {
 import { getShippingFee } from "@/lib/shipping";
 import { getAppUrl, getStripe } from "@/lib/stripe";
 import type { CheckoutAddress, CheckoutRequest } from "@/types/checkout";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { resolveUserFromRequest } from "@/lib/server/auth";
+import { updateMemberProfile } from "@/lib/server/members";
 
 function isValidEmail(email: string | undefined) {
   return Boolean(email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
 }
 
-function isValidAddress(address: CheckoutAddress | undefined) {
+function isValidAddress(
+  address: CheckoutAddress | undefined,
+): address is CheckoutAddress {
   if (!address) return false;
 
   return Boolean(
@@ -52,58 +54,29 @@ function guestDisplayName(address: CheckoutAddress) {
 }
 
 async function resolveUser(request: Request): Promise<CheckoutMember | null> {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(`${API_URL}/profile`, {
-      headers: { Authorization: authHeader },
-      cache: "no-store",
-    });
-
-    if (!response.ok) return null;
-
-    const data = (await response.json()) as { user?: CheckoutMember };
-    if (!data.user?.user_id || !data.user.email) return null;
-
-    return data.user;
-  } catch {
-    return null;
-  }
+  const user = await resolveUserFromRequest(request);
+  if (!user?.user_id || !user.email) return null;
+  return user;
 }
 
 async function syncMemberProfile(
-  authHeader: string,
+  request: Request,
   billing: CheckoutAddress,
   shipping: CheckoutAddress,
 ) {
-  const response = await fetch(`${API_URL}/profile`, {
-    method: "PUT",
-    headers: {
-      Authorization: authHeader,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      first_name: billing.firstName,
-      last_name: billing.lastName,
-      phone: billing.phone,
-      country: shipping.country,
-      city: shipping.city,
-      street_address: shipping.address1,
-      postal_code: shipping.postalCode,
-      recipient_name: `${shipping.firstName} ${shipping.lastName}`.trim(),
-    }),
+  const user = await resolveUserFromRequest(request);
+  if (!user) return null;
+
+  return updateMemberProfile(user.user_id, {
+    first_name: billing.firstName,
+    last_name: billing.lastName || null,
+    phone: billing.phone,
+    country: shipping.country,
+    city: shipping.city,
+    street_address: shipping.address1,
+    postal_code: shipping.postalCode,
+    recipient_name: `${shipping.firstName} ${shipping.lastName}`.trim(),
   });
-
-  if (!response.ok) {
-    const data = (await response.json()) as { error?: string };
-    throw new Error(data.error || "同步會員資料失敗");
-  }
-
-  const data = (await response.json()) as { user?: CheckoutMember };
-  return data.user ?? null;
 }
 
 export async function POST(request: Request) {
@@ -125,15 +98,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const shippingAddress = body.shippingSameAsBilling
-      ? body.billing
-      : body.shipping;
+    const billing = body.billing;
 
-    if (!isValidAddress(shippingAddress)) {
+    let shippingAddress: CheckoutAddress;
+    if (body.shippingSameAsBilling) {
+      shippingAddress = billing;
+    } else if (!isValidAddress(body.shipping)) {
       return NextResponse.json(
         { error: "請填寫完整的配送地址與電郵。" },
         { status: 400 },
       );
+    } else {
+      shippingAddress = body.shipping;
     }
 
     const shippingMethod = body.shippingMethod === "pickup" ? "pickup" : "delivery";
@@ -141,7 +117,7 @@ export async function POST(request: Request) {
     const isMember = authHeader?.startsWith("Bearer ");
 
     const user = isMember
-      ? (await syncMemberProfile(authHeader!, body.billing, shippingAddress)) ||
+      ? (await syncMemberProfile(request, billing, shippingAddress)) ||
         (await resolveUser(request))
       : null;
 
@@ -161,7 +137,7 @@ export async function POST(request: Request) {
     const totalAmount = subtotal + getShippingFee(shippingMethod);
 
     const guestName = guestDisplayName(shippingAddress);
-    const guestEmail = body.billing.email.trim().toLowerCase();
+    const guestEmail = billing.email.trim().toLowerCase();
     const guestPhone = shippingAddress.phone;
 
     const metadata: Record<string, string> = {
@@ -169,7 +145,7 @@ export async function POST(request: Request) {
       shipping_method: shippingMethod,
       order_notes: body.orderNotes?.trim() || "",
       shipping_address_text: formatAddressText(shippingAddress),
-      billing_address: formatAddressText(body.billing),
+      billing_address: formatAddressText(billing),
       total_amount: String(totalAmount),
       cart: JSON.stringify(
         resolved.map(({ product, quantity }) => ({
@@ -193,7 +169,7 @@ export async function POST(request: Request) {
         stripe,
         customer.id,
         user,
-        body.billing,
+        billing,
         shippingAddress,
       );
       customerId = customer.id;
@@ -206,7 +182,7 @@ export async function POST(request: Request) {
 
       const customer = await createGuestStripeCustomer(
         stripe,
-        body.billing,
+        billing,
         shippingAddress,
       );
       customerId = customer.id;

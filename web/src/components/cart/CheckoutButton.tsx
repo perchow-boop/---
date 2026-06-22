@@ -9,7 +9,6 @@ export function CheckoutButton() {
   return (
     <Link
       href="/checkout"
-      onClick={() => closeCart()}
       className={`block w-full rounded-lg bg-accent px-4 py-3.5 text-center text-sm font-bold text-accent-contrast transition-opacity ${
         items.length === 0
           ? "pointer-events-none opacity-40"
@@ -17,7 +16,11 @@ export function CheckoutButton() {
       }`}
       aria-disabled={items.length === 0}
       onClick={(event) => {
-        if (items.length === 0) event.preventDefault();
+        if (items.length === 0) {
+          event.preventDefault();
+          return;
+        }
+        closeCart();
       }}
     >
       前往結帳

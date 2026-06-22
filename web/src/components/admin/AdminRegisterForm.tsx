@@ -11,7 +11,7 @@ const ROLES: Admin["role"][] = ["superadmin", "manager", "staff"];
 
 export function AdminRegisterForm() {
   const router = useRouter();
-  const { admin, token } = useAdminAuth();
+  const { admin, token, login } = useAdminAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,6 +54,12 @@ export function AdminRegisterForm() {
       setUsername("");
       setEmail("");
       setPassword("");
+
+      if (isBootstrap && data.token && data.admin) {
+        login(data.token, data.admin);
+        router.push("/admin/products");
+        return;
+      }
 
       if (isBootstrap) {
         setTimeout(() => router.push("/admin/login"), 1200);

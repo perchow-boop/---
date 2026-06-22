@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { INTERNAL_API } from "@/lib/api-client";
 
 export type Admin = {
   admin_id: number;
@@ -13,6 +13,7 @@ export type Admin = {
 export type AdminLoginResponse = {
   message: string;
   token: string;
+  expires_at: string;
   admin: Admin;
 };
 
@@ -23,7 +24,7 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -31,9 +32,7 @@ async function request<T>(
       },
     });
   } catch {
-    throw new Error(
-      `無法連線至 API（${API_URL}）。請確認 server 已執行 npm run dev`,
-    );
+    throw new Error("無法連線至管理員 API，請確認 Next.js 開發伺服器是否正常運作");
   }
 
   let data: { error?: string };
@@ -59,7 +58,12 @@ export async function registerAdmin(
   },
   token?: string,
 ) {
-  return request<{ message: string; admin: Admin }>("/admin/register", {
+  return request<{
+    message: string;
+    admin: Admin;
+    token?: string;
+    expires_at?: string;
+  }>(`${INTERNAL_API.admin}/register`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: JSON.stringify(payload),
@@ -70,20 +74,20 @@ export async function loginAdmin(payload: {
   username: string;
   password: string;
 }) {
-  return request<AdminLoginResponse>("/admin/login", {
+  return request<AdminLoginResponse>(`${INTERNAL_API.admin}/login`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function fetchAdminProfile(token: string) {
-  return request<{ admin: Admin }>("/admin/profile", {
+  return request<{ admin: Admin }>(`${INTERNAL_API.admin}/profile`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function logoutAdmin(token: string) {
-  return request<{ message: string }>("/admin/logout", {
+  return request<{ message: string }>(`${INTERNAL_API.admin}/logout`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -104,7 +108,7 @@ export const emptyAdminForm: AdminFormData = {
 };
 
 export async function fetchAdmins(token: string) {
-  return request<{ admins: Admin[] }>("/admin/admins", {
+  return request<{ admins: Admin[] }>(`${INTERNAL_API.admin}/admins`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -118,16 +122,22 @@ export async function updateAdmin(
     password?: string;
   },
 ) {
-  return request<{ message: string; admin: Admin }>(`/admin/admins/${id}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
+  return request<{ message: string; admin: Admin }>(
+    `${INTERNAL_API.admin}/admins/${id}`,
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function deleteAdmin(token: string, id: number) {
-  return request<{ message: string }>(`/admin/admins/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  return request<{ message: string }>(
+    `${INTERNAL_API.admin}/admins/${id}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }

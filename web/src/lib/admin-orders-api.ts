@@ -1,6 +1,5 @@
 import type { AdminOrderDetail, AdminOrderSummary } from "@/types/order";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { INTERNAL_API } from "@/lib/api-client";
 
 async function request<T>(
   path: string,
@@ -10,7 +9,7 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(path, {
       cache: "no-store",
       ...options,
       headers: {
@@ -20,9 +19,7 @@ async function request<T>(
       },
     });
   } catch {
-    throw new Error(
-      `無法連線至 API（${API_URL}）。請確認 server 已執行 npm run dev`,
-    );
+    throw new Error("無法連線至管理員訂單 API，請確認 Next.js 開發伺服器是否正常運作");
   }
 
   let data: { error?: string };
@@ -41,14 +38,17 @@ async function request<T>(
 
 export async function fetchAdminOrders(token: string) {
   const data = await request<{ orders: AdminOrderSummary[] }>(
-    "/admin/orders",
+    `${INTERNAL_API.admin}/orders`,
     token,
   );
   return data.orders;
 }
 
 export async function fetchAdminOrderDetail(token: string, orderId: number) {
-  return request<AdminOrderDetail>(`/admin/orders/${orderId}`, token);
+  return request<AdminOrderDetail>(
+    `${INTERNAL_API.admin}/orders/${orderId}`,
+    token,
+  );
 }
 
 export async function updateAdminOrderStatus(
@@ -61,7 +61,7 @@ export async function updateAdminOrderStatus(
     order_id: number;
     status: string;
     updated_at: string;
-  }>(`/admin/orders/${orderId}/status`, token, {
+  }>(`${INTERNAL_API.admin}/orders/${orderId}/status`, token, {
     method: "PUT",
     body: JSON.stringify({ status }),
   });

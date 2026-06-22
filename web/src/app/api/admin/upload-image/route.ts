@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
+import { canManageProducts, requireAdmin } from "@/lib/server/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -16,45 +16,19 @@ function sanitizeFilename(name: string) {
   return base || `image-${Date.now()}.png`;
 }
 
-async function verifyAdmin(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader) {
-    return { error: "請先登入管理員帳號", status: 401 };
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}/admin/profile`, {
-      headers: { Authorization: authHeader },
-      cache: "no-store",
-    });
-  } catch {
-    return { error: "無法連線至管理員 API", status: 503 };
-  }
-
-  if (!response.ok) {
-    return { error: "管理員驗證失敗", status: 401 };
-  }
-
-  const data = (await response.json()) as {
-    admin?: { role?: string };
-  };
-
-  if (
-    data.admin?.role !== "superadmin" &&
-    data.admin?.role !== "manager"
-  ) {
-    return { error: "權限不足，無法上傳圖片", status: 403 };
-  }
-
-  return { ok: true as const };
-}
-
 export async function POST(request: Request) {
   try {
-    const auth = await verifyAdmin(request);
-    if ("error" in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const auth = await requireAdmin(request);
+    if (auth instanceof Response) {
+      const data = await auth.json();
+      return NextResponse.json(data, { status: auth.status });
+    }
+
+    if (!canManageProducts(auth.admin.role)) {
+      return NextResponse.json(
+        { error: "此角色無法上傳商品圖片（僅 superadmin / manager）" },
+        { status: 403 },
+      );
     }
 
     const formData = await request.formData();
